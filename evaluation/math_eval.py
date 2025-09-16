@@ -115,7 +115,17 @@ def prepare_data(data_name, args):
 
 def setup(args):
     # load model
-    available_gpus = os.environ["CUDA_VISIBLE_DEVICES"].split(",")
+    # Be robust when CUDA_VISIBLE_DEVICES is not preset (e.g., HF 8-bit path)
+    cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+    if cuda_visible is not None and len(cuda_visible) > 0:
+        available_gpus = cuda_visible.split(",")
+    else:
+        if torch.cuda.is_available():
+            # Default to all detected GPUs if env var not set
+            available_gpus = [str(i) for i in range(torch.cuda.device_count())]
+            os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(available_gpus)
+        else:
+            available_gpus = []
     if args.use_vllm:
         llm = LLM(
             model=args.model_name_or_path,
